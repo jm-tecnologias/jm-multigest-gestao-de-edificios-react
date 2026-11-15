@@ -15,6 +15,7 @@ export async function createApartment(tokenData, params) {
       number: params.number,
       type: params.type,
       description: params.description,
+      category_id: params.category_id,
       building_id: tokenData.user.building_id
 
     }),
@@ -40,6 +41,7 @@ export async function updateApartment(tokenData, id, params) {
       number: params.number,
       type: params.type,
       description: params.description,
+      category_id: params.category_id
 
     }),
   })

@@ -1,5 +1,6 @@
 
-import React, { useState, useEffect } from 'react';
+
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   StyleSheet,
   Text,
@@ -12,16 +13,25 @@ import {
   Platform,
 } from 'react-native';
 import { X, Calendar, ChevronDown, Check } from 'lucide-react-native';
-// 1. Importa o componente do DateTimePicker
 import DateTimePicker from '@react-native-community/datetimepicker';
 
-export default function NewClientModal({ visible, onClose, onSave, clientData, apartmentData = [] }) {
+export default function NewClientModal({
+  visible,
+  onClose,
+  onSave,
+  packageData = [],
+}) {
   const { width } = useWindowDimensions();
   const isMobile = width < 768;
 
-  const [isTypeDropdownOpen, setIsTypeDropdownOpen] = useState(false);
+  const [selectedGroup, setSelectedGroup] = useState('');
+  const [selectedType, setSelectedType] = useState('');
+  const [selectedCategoryId, setSelectedCategoryId] = useState(null);
 
-  // Estados para controlar a visibilidade dos datepickers no mobile
+  const [isGroupDropdownOpen, setIsGroupDropdownOpen] = useState(false);
+  const [isTypeDropdownOpen, setIsTypeDropdownOpen] = useState(false);
+  const [isApartmentDropdownOpen, setIsApartmentDropdownOpen] = useState(false);
+
   const [showOccupationalPicker, setShowOccupationalPicker] = useState(false);
   const [showFinalPicker, setShowFinalPicker] = useState(false);
 
@@ -40,51 +50,136 @@ export default function NewClientModal({ visible, onClose, onSave, clientData, a
     number: '',
     client_relationship: 'Parent',
     apartment_id: '',
+    price: 0, // <-- Novo campo
   });
 
+  // 1. Filtra apenas categorias ativas
+  const activeCategories = useMemo(
+    () => (packageData?.categories === undefined ? [] : packageData?.categories).filter((c) => c.is_active !== false),
+    [(packageData?.categories === undefined ? [] : packageData?.categories)]
+  );
+
+  // 2. Valores únicos da coluna "group" para o 1º dropdown
+  const availableGroups = useMemo(() => {
+    return [...new Set(activeCategories.map((c) => c.group).filter(Boolean))];
+  }, [activeCategories]);
+
+  // 3. Tipos disponíveis em função do "group" selecionado (2º dropdown)
+  const availableTypesForGroup = useMemo(() => {
+    if (!selectedGroup) return [];
+    return activeCategories.filter((c) => c.group === selectedGroup);
+  }, [activeCategories, selectedGroup]);
+
+  // 4. Apartamentos disponíveis em função da categoria selecionada (Grupo + Tipo)
+  const availableApartmentsForCategory = useMemo(() => {
+    if (!selectedCategoryId) return [];
+    return  packageData?.apartments.filter((apt) => {
+      const sameCategory = Number(apt.category_id) === Number(selectedCategoryId);
+      // Mostra apartamentos livres ou o apartamento já associado ao cliente em edição
+      const isAvailable =
+        apt.occupation_state !== 'Ocupado' ||
+        String(apt.id) === String(packageData?.clientData?.apartment_id);
+      return sameCategory && isAvailable;
+    });
+  }, [packageData?.apartments, selectedCategoryId, packageData?.clientData]);
+
+  // Preenche o formulário (Modo Edição ou Criação)
   useEffect(() => {
-    if (clientData) {
+    if (packageData?.clientData) {
+      const currentApartment = packageData?.apartments.find(
+        (apt) => String(apt.id) === String(packageData?.clientData.apartment_id)
+      );
+      const currentCategory = activeCategories.find(
+        (cat) => Number(cat.id) === Number(currentApartment?.category_id)
+      );
+
+      setSelectedGroup(currentCategory?.group || '');
+      setSelectedType(currentCategory?.type || '');
+      setSelectedCategoryId(currentCategory?.id || null);
+
       setFormData({
-        id: String(clientData.id || ''),
-        client_id: String(clientData.client_id || ''),
-        name: String(clientData.name || ''),
-        surname: String(clientData.surname || ''),
-        num_members: String(clientData.num_members || ''),
-        description: String(clientData.description || ''),
-        phone: String(clientData.phone || ''),
-        email: String(clientData.email || ''),
-        doc_id: String(clientData.doc_id || ''),
-        occupational_date: String(clientData.occupational_date || ''),
-        final_date: String(clientData.final_date || ''),
-        number: String(clientData.number || ''),
-        client_relationship: String(clientData.client_relationship || 'Parent'),
-        apartment_id: String(clientData.apartment_id || ''),
+        id: String(packageData?.clientData.id || ''),
+        client_id: String(packageData?.clientData.client_id || ''),
+        name: String(packageData?.clientData.name || ''),
+        surname: String(packageData?.clientData.surname || ''),
+        num_members: String(packageData?.clientData.num_members || ''),
+        description: String(packageData?.clientData.description || ''),
+        phone: String(packageData?.clientData.phone || ''),
+        email: String(packageData?.clientData.email || ''),
+        doc_id: String(packageData?.clientData.doc_id || ''),
+        occupational_date: String(packageData?.clientData.occupational_date || ''),
+        final_date: String(packageData?.clientData.final_date || ''),
+        number: String(currentApartment?.number || packageData?.clientData.number || ''),
+        client_relationship: String(packageData?.clientData.client_relationship || 'Parent'),
+        apartment_id: String(packageData?.clientData.apartment_id || ''),
+        price: currentCategory?.price ?? packageData?.clientData.price ?? 0, // <-- Preenche o price
       });
+    } 
+ 
+    setIsGroupDropdownOpen(false);
+    setIsTypeDropdownOpen(false);
+    setIsApartmentDropdownOpen(false);
+  }, [packageData?.clientData, visible, packageData?.apartments, activeCategories]);
+
+  // 1º Dropdown: Seleção do Grupo
+  const handleSelectGroup = (group) => {
+    setSelectedGroup(group);
+    setSelectedType('');
+    setSelectedCategoryId(null);
+    setFormData((prev) => ({
+      ...prev,
+      number: '',
+      apartment_id: '',
+      price: 0, // <-- Limpa o preço ao trocar de grupo
+    }));
+    setIsGroupDropdownOpen(false);
+  };
+
+  // 2º Dropdown: Seleção do Tipo (guarda o price da category selecionada)
+  const handleSelectType = (categoryItem) => {
+    setSelectedType(categoryItem.type);
+    setSelectedCategoryId(categoryItem.id);
+
+    const matchingApts = packageData?.apartments.filter(
+      (apt) =>
+        Number(apt.category_id) === Number(categoryItem.id) &&
+        apt.occupation_state !== 'Ocupado'
+    );
+
+    if (matchingApts.length === 1) {
+      setFormData((prev) => ({
+        ...prev,
+        number: String(matchingApts[0].number),
+        apartment_id: String(matchingApts[0].id),
+        price: categoryItem.price ?? 0, // <-- Guarda o price da categoria
+      }));
     } else {
-      setFormData({
-        id: '',
-        client_id: '',
-        name: '',
-        surname: '',
-        num_members: '',
-        description: '',
-        phone: '',
-        email: '',
-        doc_id: '',
-        occupational_date: '',
-        final_date: '',
+      setFormData((prev) => ({
+        ...prev,
         number: '',
-        client_relationship: 'Parent',
-        apartment_id: ''
-      });
+        apartment_id: '',
+        price: categoryItem.price ?? 0, // <-- Guarda o price da categoria
+      }));
     }
-  }, [clientData, visible]);
+
+    setIsTypeDropdownOpen(false);
+  };
+
+  // 3º Dropdown: Seleção do Apartamento (envia o apartment_id exato)
+  const handleSelectApartment = (apartment) => {
+    setFormData((prev) => ({
+      ...prev,
+      number: String(apartment.number),
+      apartment_id: String(apartment.id),
+
+    }));
+    setIsApartmentDropdownOpen(false);
+  };
 
   const handleChange = (key, value) => {
     setFormData((prev) => ({ ...prev, [key]: value }));
   };
 
-  // Função auxiliar para formatar a data selecionada no Datepicker para 'AAAA-MM-DD'
   const formatDateToString = (date) => {
     if (!date) return '';
     const d = new Date(date);
@@ -98,19 +193,16 @@ export default function NewClientModal({ visible, onClose, onSave, clientData, a
     return [year, month, day].join('-');
   };
 
-  const handleSelectApartment = (apartment) => {
-    setFormData((prev) => ({
-      ...prev,
-      number: apartment.number,
-      apartment_id: String(apartment.id)
-    }));
-    setIsTypeDropdownOpen(false);
-  };
-
   const handleSave = () => {
+    if (!formData.apartment_id) return;
     if (onSave) {
-      onSave(formData);
+      onSave({
+        ...formData,
+        apartment_id: Number(formData.apartment_id),
+        price: Number(formData.price || 0),
+      });
     }
+  
     onClose();
   };
 
@@ -126,7 +218,9 @@ export default function NewClientModal({ visible, onClose, onSave, clientData, a
           {/* Header do Modal */}
           <View style={styles.modalHeader}>
             <View style={styles.headerTextContainer}>
-              <Text style={styles.modalTitle}>Novo Cliente</Text>
+              <Text style={styles.modalTitle}>
+                {packageData?.clientData ? 'Editar Cliente' : 'Novo Cliente'}
+              </Text>
               <Text style={styles.modalSubtitle}>
                 Registe o responsável principal e associe-o a um apartamento
               </Text>
@@ -140,14 +234,13 @@ export default function NewClientModal({ visible, onClose, onSave, clientData, a
           <ScrollView
             style={styles.formBody}
             showsVerticalScrollIndicator={false}
-            contentContainerStyle={{ paddingBottom: 60 }}
+            contentContainerStyle={{ paddingBottom: 80 }}
           >
             {/* Secção 1: Identificação e contacto */}
             <Text style={styles.sectionTitle}>Identificação e contacto</Text>
             <Text style={styles.sectionSubtitle}>Dados Principais do cliente</Text>
 
             <View style={[styles.rowGroup, isMobile && styles.rowGroupMobile]}>
-              {/* Nome */}
               <View style={[styles.fieldContainer, isMobile && styles.fieldContainerMobile]}>
                 <Text style={styles.label}>
                   Nome <Text style={styles.required}>*</Text>
@@ -161,7 +254,6 @@ export default function NewClientModal({ visible, onClose, onSave, clientData, a
                 />
               </View>
 
-              {/* Apelido */}
               <View style={[styles.fieldContainer, isMobile && styles.fieldContainerMobile]}>
                 <Text style={styles.label}>
                   Apelido <Text style={styles.required}>*</Text>
@@ -177,7 +269,6 @@ export default function NewClientModal({ visible, onClose, onSave, clientData, a
             </View>
 
             <View style={[styles.rowGroup, isMobile && styles.rowGroupMobile]}>
-              {/* Telefone */}
               <View style={[styles.fieldContainer, isMobile && styles.fieldContainerMobile]}>
                 <Text style={styles.label}>
                   Telefone <Text style={styles.required}>*</Text>
@@ -192,7 +283,6 @@ export default function NewClientModal({ visible, onClose, onSave, clientData, a
                 />
               </View>
 
-              {/* E-mail */}
               <View style={[styles.fieldContainer, isMobile && styles.fieldContainerMobile]}>
                 <Text style={styles.label}>E-mail</Text>
                 <TextInput
@@ -207,7 +297,6 @@ export default function NewClientModal({ visible, onClose, onSave, clientData, a
             </View>
 
             <View style={[styles.rowGroup, isMobile && styles.rowGroupMobile]}>
-              {/* Doc ID */}
               <View style={[styles.fieldContainer, isMobile && styles.fieldContainerMobile]}>
                 <Text style={styles.label}>
                   Doc. ID <Text style={styles.required}>*</Text>
@@ -221,7 +310,6 @@ export default function NewClientModal({ visible, onClose, onSave, clientData, a
                 />
               </View>
 
-              {/* Observações Identificação */}
               <View style={[styles.fieldContainer, isMobile && styles.fieldContainerMobile]}>
                 <Text style={styles.label}>Observações</Text>
                 <TextInput
@@ -242,51 +330,8 @@ export default function NewClientModal({ visible, onClose, onSave, clientData, a
             <Text style={styles.sectionTitle}>Associação ao edifício</Text>
             <Text style={styles.sectionSubtitle}>Apartamento e situação actual do cliente</Text>
 
-            <View style={[styles.rowGroup, isMobile && styles.rowGroupMobile, { zIndex: 9999 }]}>
-              {/* Dropdown Apartamento */}
-              <View style={[styles.fieldContainer, isMobile && styles.fieldContainerMobile, { zIndex: 9999, position: 'relative' }]}>
-                <Text style={styles.label}>
-                  Apartamento <Text style={styles.required}>*</Text>
-                </Text>
-                <TouchableOpacity
-                  style={styles.dropdown}
-                  onPress={() => setIsTypeDropdownOpen(!isTypeDropdownOpen)}
-                >
-                  <Text style={formData.number ? styles.dropdownSelectedText : styles.dropdownPlaceholder}>
-                    {formData.number || 'Seleccione o apartamento'}
-                  </Text>
-                  <ChevronDown color="#64748B" size5={16} />
-                </TouchableOpacity>
-
-                {/* Lista de Opções do Dropdown */}
-                {isTypeDropdownOpen && (
-                  <View style={styles.dropdownListContainer}>
-                    <ScrollView style={{ maxHeight: 160 }} nestedScrollEnabled={true}>
-                      {apartmentData.map((t) => (
-                        <TouchableOpacity
-                          key={t.id}
-                          style={[
-                            styles.dropdownOption,
-                            formData.apartment_id === String(t.id) && styles.dropdownOptionSelected,
-                          ]}
-                          onPress={() => handleSelectApartment(t)}
-                        >
-                          <Text
-                            style={[
-                              styles.dropdownOptionText,
-                              formData.apartment_id === String(t.id) && styles.dropdownOptionTextSelected,
-                            ]}
-                          >
-                            {t.number}
-                          </Text>
-                          {formData.apartment_id === String(t.id) && <Check color="#0284C7" size={14} />}
-                        </TouchableOpacity>
-                      ))}
-                    </ScrollView>
-                  </View>
-                )}
-              </View>
-
+            {/* Linha 1: Agregado (número) + Grupo */}
+            <View style={[styles.rowGroup, isMobile && styles.rowGroupMobile, { zIndex: 10002 }]}>
               {/* Agregado (número) */}
               <View style={[styles.fieldContainer, isMobile && styles.fieldContainerMobile]}>
                 <Text style={styles.label}>
@@ -301,20 +346,183 @@ export default function NewClientModal({ visible, onClose, onSave, clientData, a
                   onChangeText={(val) => handleChange('num_members', val)}
                 />
               </View>
+
+              {/* 1º Dropdown: Grupo */}
+              <View style={[styles.fieldContainer, isMobile && styles.fieldContainerMobile, { zIndex: 10002 }]}>
+                <Text style={styles.label}>
+                  Grupo <Text style={styles.required}>*</Text>
+                </Text>
+                <TouchableOpacity
+                  style={styles.dropdown}
+                  onPress={() => {
+                    setIsGroupDropdownOpen(!isGroupDropdownOpen);
+                    setIsTypeDropdownOpen(false);
+                    setIsApartmentDropdownOpen(false);
+                  }}
+                >
+                  <Text style={selectedGroup ? styles.dropdownSelectedText : styles.dropdownPlaceholder}>
+                    {selectedGroup || 'Seleccionar grupo'}
+                  </Text>
+                  <ChevronDown color="#64748B" size={16} />
+                </TouchableOpacity>
+
+                {isGroupDropdownOpen && (
+                  <View style={styles.dropdownListContainer}>
+                    <ScrollView style={{ maxHeight: 160 }} nestedScrollEnabled={true}>
+                      {availableGroups.map((group) => (
+                        <TouchableOpacity
+                          key={group}
+                          style={[
+                            styles.dropdownOption,
+                            selectedGroup === group && styles.dropdownOptionSelected,
+                          ]}
+                          onPress={() => handleSelectGroup(group)}
+                        >
+                          <Text
+                            style={[
+                              styles.dropdownOptionText,
+                              selectedGroup === group && styles.dropdownOptionTextSelected,
+                            ]}
+                          >
+                            {group}
+                          </Text>
+                          {selectedGroup === group && <Check color="#0284C7" size={14} />}
+                        </TouchableOpacity>
+                      ))}
+                    </ScrollView>
+                  </View>
+                )}
+              </View>
             </View>
 
+            {/* Linha 2: Tipo + Apartamento lado a lado */}
+            <View style={[styles.rowGroup, isMobile && styles.rowGroupMobile, { zIndex: 9500 }]}>
+              {/* 2º Dropdown: Tipo (Dependente do Grupo) */}
+              <View style={[styles.fieldContainer, isMobile && styles.fieldContainerMobile, { zIndex: 9502 }]}>
+                <Text style={styles.label}>
+                  Tipo <Text style={styles.required}>*</Text>
+                </Text>
+                <TouchableOpacity
+                  style={[styles.dropdown, !selectedGroup && styles.dropdownDisabled]}
+                  disabled={!selectedGroup}
+                  onPress={() => {
+                    setIsTypeDropdownOpen(!isTypeDropdownOpen);
+                    setIsGroupDropdownOpen(false);
+                    setIsApartmentDropdownOpen(false);
+                  }}
+                >
+                  <Text style={selectedType ? styles.dropdownSelectedText : styles.dropdownPlaceholder}>
+                    {selectedType || (selectedGroup ? 'Seleccionar tipo' : 'Escolha o grupo primeiro')}
+                  </Text>
+                  <ChevronDown color="#64748B" size={16} />
+                </TouchableOpacity>
+
+                {isTypeDropdownOpen && (
+                  <View style={styles.dropdownListContainer}>
+                    <ScrollView style={{ maxHeight: 160 }} nestedScrollEnabled={true}>
+                      {availableTypesForGroup.map((cat) => (
+                        <TouchableOpacity
+                          key={cat.id}
+                          style={[
+                            styles.dropdownOption,
+                            selectedType === cat.type && styles.dropdownOptionSelected,
+                          ]}
+                          onPress={() => handleSelectType(cat)}
+                        >
+                          <Text
+                            style={[
+                              styles.dropdownOptionText,
+                              selectedType === cat.type && styles.dropdownOptionTextSelected,
+                            ]}
+                          >
+                            {cat.type}
+                          </Text>
+                          {selectedType === cat.type && <Check color="#0284C7" size={14} />}
+                        </TouchableOpacity>
+                      ))}
+                    </ScrollView>
+                  </View>
+                )}
+              </View>
+
+              {/* 3º Dropdown: Apartamento (Dependente da Categoria escolhida) */}
+              <View style={[styles.fieldContainer, isMobile && styles.fieldContainerMobile, { zIndex: 9501 }]}>
+                <Text style={styles.label}>
+                  Apartamento <Text style={styles.required}>*</Text>
+                </Text>
+                <TouchableOpacity
+                  style={[styles.dropdown, !selectedCategoryId && styles.dropdownDisabled]}
+                  disabled={!selectedCategoryId}
+                  onPress={() => {
+                    setIsApartmentDropdownOpen(!isApartmentDropdownOpen);
+                    setIsGroupDropdownOpen(false);
+                    setIsTypeDropdownOpen(false);
+                  }}
+                >
+                  <Text
+                    style={formData.apartment_id ? styles.dropdownSelectedText : styles.dropdownPlaceholder}
+                    numberOfLines={1}
+                  >
+                    {formData.apartment_id
+                      ? `Apto ${formData.number} (ID: ${formData.apartment_id})`
+                      : selectedCategoryId
+                        ? availableApartmentsForCategory.length > 0
+                          ? 'Seleccionar apartamento'
+                          : 'Sem apartamentos disponíveis'
+                        : 'Escolha o grupo e o tipo primeiro'}
+                  </Text>
+                  <ChevronDown color="#64748B" size={16} />
+                </TouchableOpacity>
+
+                {isApartmentDropdownOpen && (
+                  <View style={styles.dropdownListContainer}>
+                    <ScrollView style={{ maxHeight: 160 }} nestedScrollEnabled={true}>
+                      {availableApartmentsForCategory.map((apt) => (
+                        <TouchableOpacity
+                          key={apt.id}
+                          style={[
+                            styles.dropdownOption,
+                            String(formData.apartment_id) === String(apt.id) && styles.dropdownOptionSelected,
+                          ]}
+                          onPress={() => handleSelectApartment(apt)}
+                        >
+                          <Text
+                            style={[
+                              styles.dropdownOptionText,
+                              String(formData.apartment_id) === String(apt.id) && styles.dropdownOptionTextSelected,
+                            ]}
+                          >
+                            Apto {apt.number} — Andar {apt.floor}
+                          </Text>
+                          {String(formData.apartment_id) === String(apt.id) && (
+                            <Check color="#0284C7" size={14} />
+                          )}
+                        </TouchableOpacity>
+                      ))}
+                      {availableApartmentsForCategory.length === 0 && (
+                        <View style={styles.dropdownOption}>
+                          <Text style={styles.dropdownPlaceholder}>
+                            Nenhum apartamento livre encontrado
+                          </Text>
+                        </View>
+                      )}
+                    </ScrollView>
+                  </View>
+                )}
+              </View>
+            </View>
+
+            {/* Datas de Entrada e Saída */}
             <View style={[styles.rowGroup, isMobile && styles.rowGroupMobile]}>
-              {/* Data de Entrada com Datepicker Nativo */}
               <View style={[styles.fieldContainer, isMobile && styles.fieldContainerMobile]}>
                 <Text style={styles.label}>
                   Data de Entrada <Text style={styles.required}>*</Text>
                 </Text>
-                
+
                 {Platform.OS === 'web' ? (
-                  // Na Web usa input type="date" nativo do browser
                   <View style={styles.dateInputContainer}>
                     <TextInput
-                    placeholder="AAAA-MM-DD"
+                      placeholder="AAAA-MM-DD"
                       style={styles.dateInput}
                       value={formData.occupational_date}
                       onChangeText={(val) => handleChange('occupational_date', val)}
@@ -325,10 +533,9 @@ export default function NewClientModal({ visible, onClose, onSave, clientData, a
                     </View>
                   </View>
                 ) : (
-                  // No Mobile (iOS/Android) abre o DateTimePicker ao clicar
                   <>
-                    <TouchableOpacity 
-                      style={styles.dateInputContainer} 
+                    <TouchableOpacity
+                      style={styles.dateInputContainer}
                       onPress={() => setShowOccupationalPicker(true)}
                     >
                       <Text style={[styles.dateInput, { paddingVertical: 10 }]}>
@@ -356,15 +563,13 @@ export default function NewClientModal({ visible, onClose, onSave, clientData, a
                 )}
               </View>
 
-              {/* Data de Saída com Datepicker Nativo */}
               <View style={[styles.fieldContainer, isMobile && styles.fieldContainerMobile]}>
                 <Text style={styles.label}>Data de Saída</Text>
 
                 {Platform.OS === 'web' ? (
                   <View style={styles.dateInputContainer}>
                     <TextInput
-                    
-                    placeholder="AAAA-MM-DD"
+                      placeholder="AAAA-MM-DD"
                       style={styles.dateInput}
                       value={formData.final_date}
                       onChangeText={(val) => handleChange('final_date', val)}
@@ -376,8 +581,8 @@ export default function NewClientModal({ visible, onClose, onSave, clientData, a
                   </View>
                 ) : (
                   <>
-                    <TouchableOpacity 
-                      style={styles.dateInputContainer} 
+                    <TouchableOpacity
+                      style={styles.dateInputContainer}
                       onPress={() => setShowFinalPicker(true)}
                     >
                       <Text style={[styles.dateInput, { paddingVertical: 10 }]}>
@@ -409,14 +614,25 @@ export default function NewClientModal({ visible, onClose, onSave, clientData, a
 
           {/* Footer com Botões */}
           <View style={[styles.modalFooter, isMobile && styles.modalFooterMobile]}>
-            <Text style={styles.requiredNotice}>Campos obrigatórios *</Text>
+            <Text style={styles.requiredNotice}>Campos obrigatórios (*)</Text>
 
             <View style={[styles.footerButtonsGroup, isMobile && styles.footerButtonsGroupMobile]}>
-              <TouchableOpacity style={[styles.cancelButton, isMobile && styles.fullWidthButton]} onPress={onClose}>
+              <TouchableOpacity
+                style={[styles.cancelButton, isMobile && styles.fullWidthButton]}
+                onPress={onClose}
+              >
                 <Text style={styles.cancelButtonText}>Cancelar</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity style={[styles.saveButton, isMobile && styles.fullWidthButton]} onPress={handleSave}>
+              <TouchableOpacity
+                style={[
+                  styles.saveButton,
+                  isMobile && styles.fullWidthButton,
+                  !formData.apartment_id && { opacity: 0.5 },
+                ]}
+                disabled={!formData.apartment_id}
+                onPress={handleSave}
+              >
                 <Text style={styles.saveButtonText}>Guardar</Text>
               </TouchableOpacity>
             </View>
@@ -510,6 +726,7 @@ const styles = StyleSheet.create({
   fieldContainer: {
     flex: 1,
     minWidth: 260,
+    position: 'relative',
   },
   fieldContainerMobile: {
     width: '100%',
@@ -550,13 +767,22 @@ const styles = StyleSheet.create({
     height: 40,
     backgroundColor: '#FFFFFF',
   },
+  dropdownDisabled: {
+    backgroundColor: '#F8FAFC',
+    borderColor: '#E2E8F0',
+  },
   dropdownPlaceholder: {
     fontSize: 13,
     color: '#94A3B8',
+    flex: 1,
+    paddingRight: 6,
   },
   dropdownSelectedText: {
     fontSize: 13,
     color: '#0F172A',
+    fontWeight: '500',
+    flex: 1,
+    paddingRight: 6,
   },
   dropdownListContainer: {
     position: 'absolute',

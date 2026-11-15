@@ -22,6 +22,7 @@ import VisitorAccessModal from './modals/VisitorAccessModal';
 import { createMemberCheckInOut, getMember, scanMember } from '../service/_member-events';
 import { getApartment } from '../service/_apartment-events';
 import { createVisitorCheckInOut, listVisitors, scanVisitor } from '../service/_visitor-events';
+import { Erro, Loading, NoData } from '../components/status-components';
 
 const ITEMS_PER_PAGE = 4;
 
@@ -31,8 +32,6 @@ export default function SecurityScreen({ navigation, route }) {
     const [error, setError] = useState(null);
 
     const [allVisitors, setAllVisitors] = useState([]);
-    const [apartmentsMap, setApartmentsMap] = useState({});
-    const [memberMap, setMemberMap] = useState({});
 
     const [activeMenu, setActiveMenu] = useState('Segurança');
     const [selectedVisitor, setSelectedVisitor] = useState('1');
@@ -57,12 +56,12 @@ export default function SecurityScreen({ navigation, route }) {
     // FILTRAGEM CORRETA DOS DADOS POR STATUS
     // =========================================================
     const waitingVisitors = useMemo(() => {
-        return allVisitors.filter(item => item.status === 'Esperando Check In');
+        return allVisitors.filter(item => item.status === 'Esperando Check-In');
     }, [allVisitors]);
 
     // Exemplo para "Últimos acessos" (ajuste a condição de status conforme a sua regra de negócio, ex: 'Concluído' ou diferente de 'Esperando Check In')
     const recentAccessList = useMemo(() => {
-        return allVisitors.filter(item => item.status !== 'Esperando Check In');
+        return allVisitors.filter(item => item.status !== 'Esperando Check-In');
     }, [allVisitors]);
 
     // =========================================================
@@ -71,7 +70,7 @@ export default function SecurityScreen({ navigation, route }) {
     const totalWaitingPages = Math.ceil(waitingVisitors.length / ITEMS_PER_PAGE) || 1;
     const validWaitingPage = waitingPage > totalWaitingPages ? totalWaitingPages : waitingPage;
     const waitingStartIndex = (validWaitingPage - 1) * ITEMS_PER_PAGE;
-    
+
     const paginatedWaiting = useMemo(() => {
         return waitingVisitors.slice(waitingStartIndex, waitingStartIndex + ITEMS_PER_PAGE);
     }, [waitingVisitors, waitingStartIndex]);
@@ -82,7 +81,7 @@ export default function SecurityScreen({ navigation, route }) {
     const totalRecentPages = Math.ceil(recentAccessList.length / ITEMS_PER_PAGE) || 1;
     const validRecentPage = recentPage > totalRecentPages ? totalRecentPages : recentPage;
     const recentStartIndex = (validRecentPage - 1) * ITEMS_PER_PAGE;
-    
+
     const paginatedRecent = useMemo(() => {
         return recentAccessList.slice(recentStartIndex, recentStartIndex + ITEMS_PER_PAGE);
     }, [recentAccessList, recentStartIndex]);
@@ -164,15 +163,32 @@ export default function SecurityScreen({ navigation, route }) {
         loadData(); // Recarrega os dados após a ação
     };
 
+    // =========================================================
+    // LOADING
+    // =========================================================
+    if (loading) {
+        <Loading />
+    }
+    // =========================================================
+    // ERRO
+    // =========================================================
+    if (error) {
+        <Erro message={error} />
+    }
+    // =========================================================
+    // SEM DADOS
+    // =========================================================
+    if (!allVisitors) {
+        <NoData />
+    }
+
     return (
         <SafeAreaView style={styles.container}>
             <StatusBar barStyle="light-content" backgroundColor="#051937" />
 
             <Navbar
                 onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
-                userName="Júlio Santos"
-                userRole="Segurança"
-                userInitials="JS"
+                loginData={loginData}
             />
 
             <View style={styles.mainLayout}>
@@ -327,7 +343,7 @@ export default function SecurityScreen({ navigation, route }) {
 
                             <View style={styles.tableHeader}>
                                 <Text style={[styles.th, { width: isMobile ? '40%' : '25%' }]}>Visitante</Text>
-                                {!isMobile && <Text style={[styles.th, { width: '25%' }]}>Descrição</Text> }
+                                {!isMobile && <Text style={[styles.th, { width: '25%' }]}>Descrição</Text>}
                                 {!isMobile && <Text style={[styles.th, { width: '20%' }]}>Data / Hora</Text>}
                                 <Text style={[styles.th, { width: isMobile ? '35%' : '15%' }]}>Status</Text>
                                 <Text style={[styles.th, { width: isMobile ? '25%' : '15%' }]}>Actualizado Em</Text>

@@ -3,12 +3,8 @@ import { StyleSheet, Text, View, TextInput, TouchableOpacity, useWindowDimension
 import { Building, Search, Bell, ChevronDown, Menu } from 'lucide-react-native';
 
 export default function Navbar({ 
-  onToggleSidebar, 
-  searchText, 
-  onSearchChange, 
-  userName = 'Amílcar Silva', 
-  userRole = 'Administrador', 
-  userInitials = 'AS' 
+  onToggleSidebar,
+  loginData, 
 }) {
   const { width } = useWindowDimensions();
   const isMobile = width < 768; // Define o limite para mobile abaixo de 768px
@@ -35,17 +31,6 @@ export default function Navbar({
         </View>
       </View>
 
-      {/* <View style={styles.globalSearchContainer}>
-        <Search color="#94A3B8" size={16} />
-        <TextInput
-          style={styles.globalSearchInput}
-          placeholder={isMobile ? "Pesquisar..." : "Pesquisar no sistema..."}
-          placeholderTextColor="#94A3B8"
-          value={searchText}
-          onChangeText={onSearchChange}
-        />
-      </View> */}
-
       <View style={styles.userProfileContainer}>
         {!isMobile && (
           <TouchableOpacity style={styles.iconButton}>
@@ -55,14 +40,14 @@ export default function Navbar({
         
         <View style={styles.userInfo}>
           <View style={styles.avatar}>
-            <Text style={styles.avatarText}>{userInitials}</Text>
+            <Text style={styles.avatarText}>{loginData?.user.name[0]}{loginData?.user.surname[0]}</Text>
           </View>
           
           {/* Oculta o nome e cargo em mobile, mostrando apenas o avatar e a seta */}
           {!isMobile && (
             <View style={styles.userTextContainer}>
-              <Text style={styles.userName} numberOfLines={1}>{userName}</Text>
-              <Text style={styles.userRole} numberOfLines={1}>{userRole}</Text>
+              <Text style={styles.userName} numberOfLines={1}>{loginData?.user.name} {loginData?.user.surname}</Text>
+              <Text style={styles.userRole} numberOfLines={1}>{loginData?.user?.role}</Text>
             </View>
           )}
 

@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   StyleSheet,
   Text,
@@ -8,53 +9,115 @@ import {
   ScrollView,
   Modal,
 } from 'react-native';
-import { X, ChevronDown, Check } from 'lucide-react-native';
+import { X, ChevronDown, Check, Tag } from 'lucide-react-native';
 
-const APARTMENT_TYPES = ['T0', 'T1', 'T2', 'T3', 'T4', 'T5', 'Duplex', 'Penthouse'];
-
-export default function NewApartmentModal({ visible, onClose, onSave, apartmentData }) {
+export default function NewApartmentModal({
+  visible,
+  onClose,
+  onSave,
+  apartmentData,
+  categories = [], // Lista de categorias vinda da API (ou prop)
+}) {
   const [formData, setFormData] = useState({
     floor: '',
     number: '',
-    type: '',
+    category_id: null,
     description: '',
   });
 
+  const [selectedGroup, setSelectedGroup] = useState('');
+  const [selectedType, setSelectedType] = useState('');
+
+  const [isGroupDropdownOpen, setIsGroupDropdownOpen] = useState(false);
   const [isTypeDropdownOpen, setIsTypeDropdownOpen] = useState(false);
 
-  // Preenche o formulário sempre que a modal abre ou o apartmentData muda
+  // Filtra apenas categorias activas
+  const activeCategories = useMemo(
+    () => categories.filter((c) => c.is_active !== false),
+    [categories]
+  );
+
+  // 1. Valores únicos da coluna "group" para o 1º dropdown
+  const availableGroups = useMemo(() => {
+    return [...new Set(activeCategories.map((c) => c.group).filter(Boolean))];
+  }, [activeCategories]);
+
+  // 2. Categorias filtradas em função do "group" selecionado para o 2º dropdown
+  const availableTypesForGroup = useMemo(() => {
+    if (!selectedGroup) return [];
+    return activeCategories.filter((c) => c.group === selectedGroup);
+  }, [activeCategories, selectedGroup]);
+
+  // 3. Categoria exata selecionada (contém o id e o price)
+  const selectedCategoryObj = useMemo(() => {
+    if (!selectedGroup || !selectedType) return null;
+    return (
+      activeCategories.find(
+        (c) => c.group === selectedGroup && c.type === selectedType
+      ) || null
+    );
+  }, [activeCategories, selectedGroup, selectedType]);
+
+  // Preenche o formulário ao abrir (Modo Edição ou Criação)
   useEffect(() => {
     if (apartmentData) {
+      const existingCategory = activeCategories.find(
+        (c) => c.id === apartmentData.category_id
+      );
+
+      setSelectedGroup(existingCategory?.group || '');
+      setSelectedType(existingCategory?.type || '');
       setFormData({
         floor: String(apartmentData.floor || ''),
         number: String(apartmentData.number || ''),
-        type: apartmentData.type || '',
+        category_id: apartmentData.category_id || null,
         description: apartmentData.description || '',
       });
     } else {
-      // Limpa o formulário se for para criar um novo
+      setSelectedGroup('');
+      setSelectedType('');
       setFormData({
         floor: '',
         number: '',
-        type: '',
+        category_id: null,
         description: '',
       });
     }
-  }, [apartmentData, visible]);
+    setIsGroupDropdownOpen(false);
+    setIsTypeDropdownOpen(false);
+  }, [apartmentData, visible, activeCategories]);
 
   const handleChange = (key, value) => {
     setFormData((prev) => ({ ...prev, [key]: value }));
   };
 
-  const handleSelectType = (selectedType) => {
-    handleChange('type', selectedType);
+  // Seleção do 1º Dropdown (Group)
+  const handleSelectGroup = (group) => {
+    setSelectedGroup(group);
+    setSelectedType(''); // Limpa o tipo ao trocar de grupo
+    handleChange('category_id', null);
+    setIsGroupDropdownOpen(false);
+  };
+
+  // Seleção do 2º Dropdown (Type dependente do Group)
+  const handleSelectType = (categoryItem) => {
+    setSelectedType(categoryItem.type);
+    handleChange('category_id', categoryItem.id);
     setIsTypeDropdownOpen(false);
   };
 
-
   const handleSave = () => {
+    if (!formData.floor.trim() || !formData.number.trim() || !formData.category_id) {
+      return;
+    }
+
     if (onSave) {
-      onSave(formData);
+      onSave({
+        floor: formData.floor.trim(),
+        number: formData.number.trim(),
+        category_id: formData.category_id,
+        description: formData.description.trim(),
+      });
     }
     onClose();
   };
@@ -71,9 +134,11 @@ export default function NewApartmentModal({ visible, onClose, onSave, apartmentD
           {/* Header do Modal */}
           <View style={styles.modalHeader}>
             <View>
-              <Text style={styles.modalTitle}>Apartamento</Text>
+              <Text style={styles.modalTitle}>
+                {apartmentData ? 'Editar Apartamento' : 'Novo Apartamento'}
+              </Text>
               <Text style={styles.modalSubtitle}>
-                Registe e/ou manutenção de unidade no edifício
+                Registo e/ou manutenção de unidade no edifício
               </Text>
             </View>
             <TouchableOpacity style={styles.closeButton} onPress={onClose}>
@@ -85,10 +150,9 @@ export default function NewApartmentModal({ visible, onClose, onSave, apartmentD
           <ScrollView
             style={styles.formBody}
             showsVerticalScrollIndicator={false}
-            // Importante: desativar o clip para evitar cortar o dropdown se necessário
             contentContainerStyle={{ paddingBottom: 40 }}
           >
-            {/* Secção 1: Dados do apartamento */}
+            {/* Secção 1: Identificação */}
             <Text style={styles.sectionTitle}>Dados do apartamento</Text>
             <Text style={styles.sectionSubtitle}>Identificação e classificação da unidade</Text>
 
@@ -122,50 +186,119 @@ export default function NewApartmentModal({ visible, onClose, onSave, apartmentD
               </View>
             </View>
 
-            {/* Aumentamos o zIndex neste container específico para o dropdown sobrepor tudo */}
+            {/* Linha com os 2 Dropdowns Dependentes (Group -> Type) */}
             <View style={[styles.rowGroup, { zIndex: 9999 }]}>
-              <View style={[styles.fieldContainer, { zIndex: 9999 }]}>
+              {/* 1º Dropdown: Grupo */}
+              <View style={[styles.fieldContainer, { zIndex: 10000 }]}>
                 <Text style={styles.label}>
-                  Tipo <Text style={styles.required}>*</Text>
+                  Grupo <Text style={styles.required}>*</Text>
                 </Text>
                 <TouchableOpacity
                   style={styles.dropdown}
-                  onPress={() => setIsTypeDropdownOpen(!isTypeDropdownOpen)}
+                  onPress={() => {
+                    setIsGroupDropdownOpen(!isGroupDropdownOpen);
+                    setIsTypeDropdownOpen(false);
+                  }}
                 >
-                  <Text style={formData.type ? styles.dropdownSelectedText : styles.dropdownPlaceholder}>
-                    {formData.type || 'Seleccionar tipo'}
+                  <Text style={selectedGroup ? styles.dropdownSelectedText : styles.dropdownPlaceholder}>
+                    {selectedGroup || 'Seleccionar grupo'}
                   </Text>
                   <ChevronDown color="#64748B" size={16} />
                 </TouchableOpacity>
 
-                {/* Lista de Opções do Dropdown com fundo opaco sólido */}
-                {isTypeDropdownOpen && (
+                {isGroupDropdownOpen && (
                   <View style={styles.dropdownListContainer}>
                     <ScrollView style={{ maxHeight: 160 }} nestedScrollEnabled={true}>
-                      {APARTMENT_TYPES.map((t) => (
+                      {availableGroups.map((group) => (
                         <TouchableOpacity
-                          key={t}
+                          key={group}
                           style={[
                             styles.dropdownOption,
-                            formData.type === t && styles.dropdownOptionSelected,
+                            selectedGroup === group && styles.dropdownOptionSelected,
                           ]}
-                          onPress={() => handleSelectType(t)}
+                          onPress={() => handleSelectGroup(group)}
                         >
                           <Text
                             style={[
                               styles.dropdownOptionText,
-                              formData.type === t && styles.dropdownOptionTextSelected,
+                              selectedGroup === group && styles.dropdownOptionTextSelected,
                             ]}
                           >
-                            {t}
+                            {group}
                           </Text>
-                          {formData.type === t && <Check color="#0284C7" size={14} />}
+                          {selectedGroup === group && <Check color="#0284C7" size={14} />}
                         </TouchableOpacity>
                       ))}
                     </ScrollView>
                   </View>
                 )}
               </View>
+
+              {/* 2º Dropdown: Tipo (Dependente do Grupo) */}
+              <View style={[styles.fieldContainer, { zIndex: 9999 }]}>
+                <Text style={styles.label}>
+                  Tipo <Text style={styles.required}>*</Text>
+                </Text>
+                <TouchableOpacity
+                  style={[
+                    styles.dropdown,
+                    !selectedGroup && styles.dropdownDisabled,
+                  ]}
+                  disabled={!selectedGroup}
+                  onPress={() => {
+                    setIsTypeDropdownOpen(!isTypeDropdownOpen);
+                    setIsGroupDropdownOpen(false);
+                  }}
+                >
+                  <Text style={selectedType ? styles.dropdownSelectedText : styles.dropdownPlaceholder}>
+                    {selectedType || (selectedGroup ? 'Seleccionar tipo' : 'Escolha o grupo primeiro')}
+                  </Text>
+                  <ChevronDown color="#64748B" size={16} />
+                </TouchableOpacity>
+
+                {isTypeDropdownOpen && (
+                  <View style={styles.dropdownListContainer}>
+                    <ScrollView style={{ maxHeight: 160 }} nestedScrollEnabled={true}>
+                      {availableTypesForGroup.map((cat) => (
+                        <TouchableOpacity
+                          key={cat.id}
+                          style={[
+                            styles.dropdownOption,
+                            selectedType === cat.type && styles.dropdownOptionSelected,
+                          ]}
+                          onPress={() => handleSelectType(cat)}
+                        >
+                          <Text
+                            style={[
+                              styles.dropdownOptionText,
+                              selectedType === cat.type && styles.dropdownOptionTextSelected,
+                            ]}
+                          >
+                            {cat.type}
+                          </Text>
+                          {selectedType === cat.type && <Check color="#0284C7" size={14} />}
+                        </TouchableOpacity>
+                      ))}
+                    </ScrollView>
+                  </View>
+                )}
+              </View>
+            </View>
+
+            {/* Tag <Text> para apresentar o Preço da Categoria selecionada */}
+            <View style={styles.priceBox}>
+              <View style={styles.priceLabelRow}>
+                <Tag color="#0284C7" size={16} />
+                <Text style={styles.priceLabel}>Preço da Categoria:</Text>
+              </View>
+              <Text style={styles.priceValue}>
+                {selectedCategoryObj
+                  ? `${Number(selectedCategoryObj.price).toLocaleString('pt-MZ', {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })} MT`
+                  : '---'}
+              </Text>
             </View>
 
             <View style={styles.divider} />
@@ -199,7 +332,14 @@ export default function NewApartmentModal({ visible, onClose, onSave, apartmentD
                 <Text style={styles.cancelButtonText}>Cancelar</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
+              <TouchableOpacity
+                style={[
+                  styles.saveButton,
+                  (!formData.floor || !formData.number || !formData.category_id) && { opacity: 0.5 },
+                ]}
+                disabled={!formData.floor || !formData.number || !formData.category_id}
+                onPress={handleSave}
+              >
                 <Text style={styles.saveButtonText}>Guardar</Text>
               </TouchableOpacity>
             </View>
@@ -224,7 +364,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderRadius: 16,
     maxHeight: '90%',
-    // IMPORTANTE: Remover overflow: 'hidden' do container principal para o dropdown não ser cortado nas bordas
   },
   modalHeader: {
     flexDirection: 'row',
@@ -299,6 +438,10 @@ const styles = StyleSheet.create({
     height: 40,
     backgroundColor: '#FFFFFF',
   },
+  dropdownDisabled: {
+    backgroundColor: '#F8FAFC',
+    borderColor: '#E2E8F0',
+  },
   dropdownPlaceholder: {
     fontSize: 13,
     color: '#94A3B8',
@@ -313,7 +456,7 @@ const styles = StyleSheet.create({
     top: 68,
     left: 0,
     right: 0,
-    backgroundColor: '#FFFFFF', // Fundo totalmente opaco e sólido
+    backgroundColor: '#FFFFFF',
     borderWidth: 1,
     borderColor: '#CBD5E1',
     borderRadius: 8,
@@ -321,8 +464,8 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.15,
     shadowRadius: 8,
-    elevation: 10, // Sombra para Android
-    zIndex: 99999, // Garante que fica acima de qualquer outro elemento
+    elevation: 10,
+    zIndex: 99999,
   },
   dropdownOption: {
     flexDirection: 'row',
@@ -330,7 +473,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingVertical: 10,
     paddingHorizontal: 14,
-    backgroundColor: '#FFFFFF', // Garante opacidade nas opções
+    backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
     borderBottomColor: '#F8FAFC',
   },
@@ -344,6 +487,33 @@ const styles = StyleSheet.create({
   dropdownOptionTextSelected: {
     color: '#0284C7',
     fontWeight: 'bold',
+  },
+  priceBox: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#F0F9FF',
+    borderWidth: 1,
+    borderColor: '#BAE6FD',
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    marginBottom: 8,
+  },
+  priceLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  priceLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#0369A1',
+  },
+  priceValue: {
+    fontSize: 15,
+    fontWeight: 'bold',
+    color: '#0284C7',
   },
   textArea: {
     height: 80,
@@ -363,6 +533,8 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: '#F1F5F9',
     backgroundColor: '#F8FAFC',
+    borderBottomLeftRadius: 16,
+    borderBottomRightRadius: 16,
   },
   requiredNotice: {
     fontSize: 12,

@@ -25,6 +25,10 @@ const API_ENDPOINTS = {
     HISTORIC:{
       CREATE: '/api/historic/create?database_name=building'
     },
+    CATEGORY: {
+      GET: (id) => `/api/category/get/${id}?database_name=building`,
+      LIST: '/api/category/list?database_name=building',
+    },
   },
 
   CLIENTS: {

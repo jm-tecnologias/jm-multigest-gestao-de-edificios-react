@@ -27,8 +27,8 @@ const App = () => {
         <Stack.Screen name="Apartamentos" component={ApartmentsScreen} />
         <Stack.Screen name="Clientes" component={ClientsScreen} />
         <Stack.Screen name="Segurança" component={SecurityScreen} />
-        {/* <Stack.Screen name="Parque Residencial" component={ResidentialParkingScreen} />
-        <Stack.Screen name="Parque Comercial" component={CommercialParkingScreen} /> */}
+        <Stack.Screen name="Parque Residencial" component={ResidentialParkingScreen} />
+        <Stack.Screen name="Parque Comercial" component={CommercialParkingScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );

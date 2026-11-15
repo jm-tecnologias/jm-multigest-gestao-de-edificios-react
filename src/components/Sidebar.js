@@ -1,20 +1,3 @@
-// import { 
-//     LayoutDashboard, 
-//     Home, 
-//     Users, 
-//     Car,             // Para veículos / carros
-//     ParkingSquare,   // Alternativa com a letra P de parque
-//     ShieldCheck 
-// } from 'lucide-react-native';
-
-// const menuItems = [
-//   { label: 'Dashboard', icon: LayoutDashboard, route: 'Dashboard' },
-//   { label: 'Apartamentos', icon: Home, route: 'Apartamentos' },
-//   { label: 'Clientes', icon: Users, route: 'Clientes' },
-//   { label: 'Parque Residencial', icon: Car, route: 'Parque Residencial' },
-//   { label: 'Parque Comercial', icon: ParkingSquare, route: 'Parque Comercial' },
-//   { label: 'Segurança', icon: ShieldCheck, route: 'Segurança' },
-// ];
 
 import React from 'react';
 import { StyleSheet, Text, View, ScrollView, TouchableOpacity, useWindowDimensions } from 'react-native';
@@ -33,8 +16,8 @@ const menuItems = [
     { label: 'Dashboard', icon: LayoutDashboard, route: 'Dashboard' },
     { label: 'Apartamentos', icon: Home, route: 'Apartamentos' },
     { label: 'Clientes', icon: Users, route: 'Clientes' },
-    // { label: 'Parque Residencial', icon: Car, route: 'Parque Residencial' },
-    // { label: 'Parque Comercial', icon: ParkingSquare, route: 'Parque Comercial' },
+    { label: 'Parque Residencial', icon: Car, route: 'Parque Residencial' },
+    { label: 'Parque Comercial', icon: ParkingSquare, route: 'Parque Comercial' },
     { label: 'Segurança', icon: ShieldCheck, route: 'Segurança' },
 ];
 

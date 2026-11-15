@@ -134,9 +134,7 @@ export default function ResidentialParkingScreen({ navigation, route }) {
 
             <Navbar
                 onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
-                userName="Júlio Santos"
-                userRole="Segurança"
-                userInitials="JS"
+                loginData={loginData}
             />
 
             <View style={styles.mainLayout}>

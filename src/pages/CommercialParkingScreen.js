@@ -156,9 +156,7 @@ export default function CommercialParkingScreen({ navigation, route }) {
 
             <Navbar
                 onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
-                userName="Júlio Santos"
-                userRole="Segurança"
-                userInitials="JS"
+                loginData={loginData}
             />
 
             <View style={styles.mainLayout}>
@@ -182,6 +180,13 @@ export default function CommercialParkingScreen({ navigation, route }) {
                                 <Text style={styles.pageSubtitle}>Controle de entradas, lugares e saldos</Text>
                             </View>
                             <View style={styles.actionButtonsRow}>
+                                {/* <TouchableOpacity
+                                    style={styles.entryButton}
+                                    onPress={() => setIsSpaceModalVisible(true)}
+                                >
+                                    <PlusCircle color="#FFFFFF" size={16} />
+                                    <Text style={styles.buttonText}>Nova Vaga</Text>
+                                </TouchableOpacity> */}
                                 <TouchableOpacity
                                     style={styles.entryButton}
                                     onPress={() => setIsEntryModalVisible(true)}
@@ -230,18 +235,26 @@ export default function CommercialParkingScreen({ navigation, route }) {
                                 />
                             </View>
                         </View>
-                        
+
 
                         {/* Tabela de Lugares Comerciais */}
                         <View style={styles.tableContainer}>
-                            <TouchableOpacity
-                                style={styles.addButton}
-                                onPress={() => setIsSpaceModalVisible(true)}
-                            >
-                                <PlusCircle color="#FFFFFF" size={16} />
-                                <Text style={styles.addButtonText}>Nova Vaga</Text>
-                            </TouchableOpacity>
-                            <Text style={styles.tableMainTitle}>Lugares do Parque Comercial</Text>
+                            {/* <Text style={styles.tableMainTitle}>Lugares do Parque Comercial</Text> */}
+                            <View style={styles.headerSection}>
+                                    <View>
+                                        <Text style={styles.tableMainTitle}>Lugares do Parque Comercial</Text>
+                                    </View>
+                                    <View style={styles.actionButtonsRow}>
+                                        <TouchableOpacity
+                                            style={styles.entryButton}
+                                            onPress={() => setIsSpaceModalVisible(true)}
+                                        >
+                                            <PlusCircle color="#FFFFFF" size={16} />
+                                            <Text style={styles.buttonText}>Nova Vaga</Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                </View>
+                            
                             <View style={styles.tableHeader}>
                                 <Text style={[styles.th, { width: '30%' }]}>Piso</Text>
                                 <Text style={[styles.th, { width: '35%' }]}>Número da Vaga</Text>
@@ -298,7 +311,7 @@ export default function CommercialParkingScreen({ navigation, route }) {
                         </View>
 
                         {/* Tabela de Controlo de Entradas e Saldos */}
-                        <View style={[styles.tableContainer, { marginTop: 24 }]}>
+                        <View style={[styles.tableContainer, { marginTop: 10 }]}>
                             <Text style={styles.tableMainTitle}>Veículos em Estacionamento & Saldos</Text>
                             <View style={styles.tableHeader}>
                                 <Text style={[styles.th, { width: '25%' }]}>Matrícula</Text>
@@ -391,7 +404,7 @@ const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#051937' },
     mainLayout: { flex: 1, flexDirection: 'row', width: '100%', height: '100%', position: 'relative' },
     contentContainer: { flex: 1, backgroundColor: '#F1F5F9', borderTopLeftRadius: 16, overflow: 'hidden' },
-    contentPadding: { padding: 24 },
+    contentPadding: { padding: 16 },
 
     headerSection: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, flexWrap: 'wrap', gap: 10 },
     pageTitle: { fontSize: 22, fontWeight: 'bold', color: '#0F172A' },
@@ -401,12 +414,12 @@ const styles = StyleSheet.create({
     exitButton: { backgroundColor: '#EF4444', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, flexDirection: 'row', alignItems: 'center', gap: 6 },
     buttonText: { color: '#FFFFFF', fontSize: 12, fontWeight: '600' },
 
-    metricsRow: { flexDirection: 'row', gap: 16, marginBottom: 20, flexWrap: 'wrap' },
+    metricsRow: { flexDirection: 'row', gap: 16, marginBottom: 10, flexWrap: 'wrap' },
     metricCard: { flex: 1, minWidth: 160, backgroundColor: '#FFFFFF', padding: 16, borderRadius: 12, flexDirection: 'row', alignItems: 'center', gap: 14, shadowColor: '#000', shadowOpacity: 0.02, shadowRadius: 4, elevation: 1 },
     metricTitle: { fontSize: 12, color: '#64748B' },
     metricValue: { fontSize: 18, fontWeight: 'bold', color: '#0F172A', marginTop: 2 },
 
-    filterCard: { backgroundColor: '#FFFFFF', padding: 16, borderRadius: 12, marginBottom: 20 },
+    filterCard: { backgroundColor: '#FFFFFF', padding: 16, borderRadius: 12, marginBottom: 10 },
     filterSearch: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 8, paddingHorizontal: 12, height: 40 },
     filterInput: { marginLeft: 8, flex: 1, height: 30, fontSize: 13, color: '#0F172A' },
 

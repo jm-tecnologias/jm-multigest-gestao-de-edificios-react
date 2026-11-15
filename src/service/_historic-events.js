@@ -19,6 +19,7 @@ export async function createHistoric(tokenData, member, params) {
             occupational_date: params.occupational_date,
             num_members: params.num_members,
             final_date: params.final_date,
+            price: params.price,
         }),
     })
     const data = await response.json()
